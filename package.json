@@ -1,10 +1,13 @@
 {
-  "name": "title-generator",
+  "name": "@natalieolivo/title-generator",
   "version": "0.1.0",
   "description": "AI-powered title/headline generator — importable library and CLI",
   "type": "module",
   "license": "MIT",
   "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
