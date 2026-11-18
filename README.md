@@ -43,7 +43,7 @@ If it's unset, both the library function and the CLI fail fast with a clear erro
 ## Usage as a library
 
 ```ts
-import { generateTitles } from "title-generator";
+import { generateTitles } from "@natalieolivo/title-generator";
 
 const titles = await generateTitles({
   subject: "a productivity app for freelancers",
@@ -58,6 +58,43 @@ console.log(titles);
 `subject` can be anything that needs a headline: a product, a blog post, an ad, a landing page. `tone` is an optional stylistic hint ("urgent", "playful", "formal", etc.). When you omit it, the provider defaults to generating a mix of angles across the requested titles — benefit-driven, curiosity-driven, social-proof, and urgency — rather than committing to one tone.
 
 Note again: until `src/providers/anthropic.ts` is implemented, calling `generateTitles` will reject with `"TODO: implement generateWithAnthropic"` once past input validation and the API-key check.
+
+## Scoring titles (`scoreTitles`)
+
+`scoreTitles` is a second, separate LLM call that judges candidate titles, so the model that writes titles does not grade them. It sees all candidates at once and ranks them against each other. Call `generateTitles` first, then `scoreTitles`.
+
+```ts
+import { generateTitles, scoreTitles, SEO_RUBRIC } from "@natalieolivo/title-generator";
+
+const titles = await generateTitles({ subject: "a productivity app for freelancers" });
+const scored = await scoreTitles({
+  subject: "a productivity app for freelancers",
+  keyword: "freelance productivity app", // optional, defaults to subject
+  titles,
+});
+```
+
+Input: `subject` (string), optional `keyword` (string, defaults to `subject`), `titles` (non-empty `string[]`).
+
+Limits (exported constants): `MAX_TITLES` = 50, `MAX_TITLE_LENGTH` = 300 characters per title, `MAX_SUBJECT_LENGTH` = 200, `MAX_KEYWORD_LENGTH` = 200. Over-limit input throws a plain `Error`.
+
+Output: `ScoredTitle[]`, one per input title in the same order. Each has `title`, `scores` (one integer per criterion), `total` (0-100), `rank` (1 = best among the candidates in this call) and a one-sentence `rationale` (trimmed and capped at `MAX_RATIONALE_LENGTH` = 300 characters).
+
+Scores are an estimate of how a title might perform in search, not real Google data. The model supplies per-criterion scores and a rationale. Scores are clamped to each criterion's range and rounded to integers, `total` is recomputed from them, and `rank` is derived from the totals (ties go to the earlier input title). Results are matched to your input titles by position, after normalizing both sides (Unicode NFKC, curly and straight quotes folded, en and em dashes folded to a hyphen, whitespace collapsed and trimmed, case-insensitive). A reordered response is not accepted. The returned `title` is always your original string, never the model's.
+
+Bad input, over-limit input, or a missing `ANTHROPIC_API_KEY` throws a plain `Error`. Model-side failures throw `ScoreTitlesError` with a `code`: `refusal`, `truncated` (hit `max_tokens` or the context window), `no_content`, `invalid_response`, or `result_mismatch`.
+
+Rubric (`SEO_RUBRIC`, total 100):
+
+| Criterion | Max |
+| --- | --- |
+| `keywordPosition` | 25 |
+| `length` | 15 |
+| `intentMatch` | 25 |
+| `uniqueness` | 20 |
+| `clickAppeal` | 15 |
+
+The CLI does not expose scoring.
 
 ## Usage as a CLI
 
